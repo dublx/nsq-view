@@ -111,7 +111,7 @@ io.on('connection', function(socket){
 });
 
 
-var port = 3009;
+var port = 3000;
 http.listen(port, function(){
   console.log('listening on *:%s', port);
 });
