@@ -22,6 +22,7 @@
     <ul id="messages"></ul>
     <script src="/socket.io/socket.io.js"></script>
     <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <script src="http://underscorejs.org/underscore-min.js"></script>
     <script>
       var socket = io();
       $('form').submit(function(){
@@ -32,9 +33,26 @@
         });
         return false;
       });
-      socket.on('topic:new', function(topicName){
-        $('#topics').append($('<option>').text(topicName));
+      socket.on('topic:list', function(topicList){
+        try {
+          $('#topics option').remove();
+          // $('#topics').options.length = 0;
+        } catch (e) {
+          console.log('error:',e);
+        }
+
+        // sort the topic list alphabetically
+        topicList = _.sortBy(topicList, function(name){return name});
+
+        // add each topic to select
+        _.each(topicList, function(topicName){
+          $('#topics').append($('<option>').text(topicName));
+        });
+
       });
+      // socket.on('topic:new', function(topicName){
+      //   $('#topics').append($('<option>').text(topicName));
+      // });
       socket.on('app:msg', function(topicName){
         $('#messages').append($('<li>').text('info: ' + msg));
       });
