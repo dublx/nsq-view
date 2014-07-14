@@ -21,12 +21,17 @@
       <button id="topicAction">Subscribe</button>
     </form>
     <ul id="messages"></ul>
+    <input type="button" name="clearMsgs" id="clearMsgs" value="Clear" onclick="clearMsgs()">
     <script src="/socket.io/socket.io.js"></script>
     <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
     <script src="http://underscorejs.org/underscore-min.js"></script>
     <script>
       var socket = io();
       var topicsSubscribed = [];
+      function clearMsgs(){
+        $('#messages li').remove();
+        return false;
+      }
       /// when user click subscribe, send a message to server to
       /// register the socket on a socket.io room with the name of topic
       $('form').submit(function(){
@@ -41,6 +46,7 @@
             socket.emit('topic:subscribe', topic);
             topicsSubscribed.push(topic);
             $('#topicAction').html('Unsubscribe');
+            $('#messages').append($('<li>').text('info' + ' : Subscribed to topic "' + topic + '"'));
             socket.on(topic, function(msg){
               $('#messages').append($('<li>').text(topic + ' : ' + msg));
             });
@@ -52,6 +58,8 @@
         {
           socket.emit('topic:unsubscribe', topic);
           topicsSubscribed = _.without(topicsSubscribed, topic);
+          socket.removeListener(topic);
+          $('#messages').append($('<li>').text('info' + ' : Unsubscribed from topic "' + topic + '"'));
           $('#topicAction').html('Subscribe');
         }
         return false;
@@ -63,7 +71,7 @@
         try {
           $('#topics option').remove();
         } catch (e) {
-          console.log('error:',e);
+          // console.log('error:',e);
         }
         // sort the topic list alphabetically
         topicList = _.sortBy(topicList, function(name){return name});

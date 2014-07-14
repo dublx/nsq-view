@@ -65,22 +65,23 @@ io.on('connection', function(socket) {
   socket.on('topic:unsubscribe', function(topic) {
     console.log('Socket %s unsubscribed to rooms %s"', socket.client.id, topic);
     socket.leave(topic);
-    var inactiveReader = _.find(nsqReaders, function(reader) {
-      if (reader.topic == topic) {
-        reader.sockets--;
-        console.log('reader.sockets', reader.sockets);
-        if (reader.sockets == 0) {
-          console.log('Destroying NSQ reader');
-          reader.close();
-          return true;
-          // reader = null;
-        }
-      } else {
-        return false;
-      }
+    var readerIndex;
+    var nsqReaderForTopic = _.find(nsqReaders, function(reader, index) {
+      readerIndex = index;
+      return reader.topic == topic;
     });
-    nsqReaders.remove(inactiveReader);
-
+    console.log('readerIndex', readerIndex);
+    if (nsqReaderForTopic) {
+      nsqReaderForTopic.sockets--;
+      console.log('NSQ reader for topic %s sockets(-): %s', nsqReaderForTopic.topic, nsqReaderForTopic.sockets);
+      if (nsqReaderForTopic.sockets == 0) {
+        console.log('Destroying NSQ reader for topic %s', nsqReaderForTopic.topic);
+        nsqReaderForTopic.close();
+        nsqReaders.splice(readerIndex,1);
+        // nsqReaders[nsqReaderForTopic] = null;
+        nsqReaderForTopic = null;
+      }
+    }
   });
 
   socket.on('topic:subscribe', function(topic) {
@@ -103,11 +104,14 @@ io.on('connection', function(socket) {
 
       // check if we already have a NSQ reader for this topic, if so, dont create another one.
       // console.log('nsqReaders', nsqReaders);
-      var nsqReaderExists = _.find(nsqReaders, function(reader) {
+      var nsqReaderForTopic = _.find(nsqReaders, function(reader) {
         if (reader.topic == topic) reader.socket++;
         return reader.topic == topic;
-      })
-      if (nsqReaderExists === undefined) {
+      });
+
+      console.log('nsqReader For Topic %s %s', topic, (nsqReaderForTopic !== undefined ? 'exists':'does not exist'));
+
+      if (!nsqReaderForTopic) {
         console.log('Creating NSQ reader for topic "%s"', topic);
         // make a new nsq nsqReader for the topic
         nsqReader = new nsq.Reader(topic, nsqChannel, nsqOptions);
@@ -134,9 +138,12 @@ io.on('connection', function(socket) {
           console.log('%s: Nsq closed %s:%s', nsqReader.topic, arguments[0], arguments[1]);
         });
         nsqReaders.push(nsqReader);
+      } else {
+        nsqReaderForTopic.sockets++;
+        console.log('NSQ reader for topic %s sockets(+): %s', nsqReaderForTopic.topic, nsqReaderForTopic.sockets);
       }
     } else {
-      console.log('NSQ reader for topic "%s" already exists.');
+      console.log('Socket already subscribed to room/topic "%s"', topic);
     }
   });
   socket.on('disconnect', function() {
