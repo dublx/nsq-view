@@ -1,13 +1,15 @@
-var nsqChannel, nsq, nsqOptions, nsqReaders, topic, nsqTopics;
+var nsqChannel, nsq, nsqOptions, topic;
 nsq = require('nsqjs');
-topic = 'sample';
 nsqChannel = 'nodejs';
-
 nsqOptions = {
   lookupdHTTPAddresses: '127.0.0.1:4161'
 };
+topic = 'sample';
+
+// declare globals
 nsqReaders = [];
 nsqTopics = [];
+
 //********
 // updates nsqlookupd nsqTopics every second
 var request = require('request');
@@ -23,6 +25,7 @@ var getTopics = function() {
         _.each(resp.data.topics, function(topic) {
           console.log('topic: ' + topic);
           nsqTopics.push(topic);
+          io.emit('app:msg', 'found topic: ' + topic);
           // announce a topic
           // io.emit('topic:new', topic);
         })
@@ -31,9 +34,8 @@ var getTopics = function() {
         if (newTopics.length > 0) console.log('registering new nsqTopics...');
         _.each(newTopics, function(topic) {
           console.log('new topic: ' + topic);
+          io.emit('app:msg', 'found topic: ' + topic);
           nsqTopics.push(topic)
-          // announce a topic
-          // io.emit('topic:new', topic);
         })
       }
       // announce nsqTopics to all socket.io connections
@@ -58,19 +60,14 @@ app.get('/', function(req, res) {
 
 io.on('connection', function(socket) {
   console.log('socket.client.id: %s connected', socket.client.id)
-
   console.log('Sending topic:list [%s] to %s', nsqTopics, socket.client.id);
   io.emit('topic:list', nsqTopics);
 
-  // _.each(nsqTopics, function(item) {
-  //   // announce a topic
-  //   io.emit('topic:new', item);
-  // })
-
   socket.on('topic:subscribe', function(topic) {
-    console.log('Socket %s is subscribed to rooms %s', socket.client.id, socket.rooms);
+
+    console.log('Socket %s is subscribed to rooms %s, requesting subscribe to "%s"', socket.client.id, socket.rooms, topic);
     var topicSubscribed = false;
-    _.find(socket.rooms, function(room) {
+    _.each(socket.rooms, function(room) {
       if (!topicSubscribed) {
         if (topic == room) {
           topicSubscribed = true;
@@ -78,21 +75,24 @@ io.on('connection', function(socket) {
       }
     });
 
-    // console.log('topicSubscribed %s', topicSubscribed);
+    console.log('topicSubscribed %s', topicSubscribed);
 
     if (!topicSubscribed) {
+      console.log('socket %s is joining room "%s"', socket.client.id, topic);
       socket.join(topic);
-      var found = _.find(nsqReaders, function(reader) {
+
+      // check if we already have a NSQ reader for this topic, if so, dont create another one.
+      var nsqReaderExists = _.find(nsqReaders, function(reader) {
         return reader.topic == topic;
       })
-      console.log('nsqReader for topic %s exists:', topic, found);
-      if (!found) {
-        console.log('Subscribing to topic "%s"', topic);
+      if (nsqReaderExists === undefined) {
+        console.log('Creating NSQ reader for topic "%s"', topic);
         // make a new nsq nsqReader for the topic
-        var nsqReader = new nsq.Reader(topic, nsqChannel, nsqOptions);
+        nsqReader = new nsq.Reader(topic, nsqChannel, nsqOptions);
         nsqReader.topic = topic;
         nsqReader.connect();
         nsqReader.on(nsq.Reader.MESSAGE, function(msg) {
+          console.log('Send NSQ msg to socket room %s', nsqReader.topic);
           io.to(nsqReader.topic).emit(nsqReader.topic, msg.body.toString());
           // console.log("%s: message [%s]: %s", nsqReader.topic, msg.id, msg.body.toString());
           return msg.finish();
@@ -110,12 +110,16 @@ io.on('connection', function(socket) {
         nsqReader.on(nsq.Reader.NSQD_CLOSED, function() {
           console.log('%s: Nsq closed %s:%s', nsqReader.topic, arguments[0], arguments[1]);
         });
-        nsqReaders.push[nsqReader];
+        nsqReaders.push(nsqReader);
+        console.log('nsqReaders', nsqReaders);
+
       }
     } else {
-      console.log('Socket %s already subscribed to topic %s', socket.client.id, topic);
-      return false;
+      console.log('NSQ reader for topic "%s" already exists.');
     }
+  });
+  socket.on('disconnect', function() {
+    console.log('socket.on:disconnect');
   });
 });
 

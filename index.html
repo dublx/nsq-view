@@ -25,35 +25,46 @@
     <script src="http://underscorejs.org/underscore-min.js"></script>
     <script>
       var socket = io();
+      var topicsSubscribed = [];
+      /// when user click subscribe, send a message to server to
+      /// register the socket on a socket.io room with the name of topic
       $('form').submit(function(){
         var topic = $('#topics').val();
-        socket.emit('topic:subscribe', topic);
-        socket.on(topic, function(msg){
-          $('#messages').append($('<li>').text(topic + ' : ' + msg));
+        var subscribed = _.find(topicsSubscribed, function(topicSubscribed){
+          return topic == topicSubscribed;
         });
+        // if topic already subscribed, dont subscribe again
+        if (!subscribed){
+          socket.emit('topic:subscribe', topic);
+          topicsSubscribed.push(topic);
+          socket.on(topic, function(msg){
+            $('#messages').append($('<li>').text(topic + ' : ' + msg));
+          });
+        } else {
+          $('#messages').append($('<li>').text('info' + ' : already subscribed to topic "' + topic + '"'));
+        }
         return false;
       });
+
+      /// the server sends a list of topics which we display in the select element
       socket.on('topic:list', function(topicList){
+        // remove all topics from select
         try {
           $('#topics option').remove();
-          // $('#topics').options.length = 0;
         } catch (e) {
           console.log('error:',e);
         }
-
         // sort the topic list alphabetically
         topicList = _.sortBy(topicList, function(name){return name});
-
-        // add each topic to select
+        // add all topics to select
         _.each(topicList, function(topicName){
           $('#topics').append($('<option>').text(topicName));
         });
-
       });
-      // socket.on('topic:new', function(topicName){
-      //   $('#topics').append($('<option>').text(topicName));
-      // });
-      socket.on('app:msg', function(topicName){
+
+      /// the server may send generic messages not tied to a topic
+      socket.on('app:msg', function(msg){
+        console.log('app:msg', msg);
         $('#messages').append($('<li>').text('info: ' + msg));
       });
     </script>
