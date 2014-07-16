@@ -1,10 +1,10 @@
-var nsqChannel, nsq, nsqOptions, topic;
+var util = require('util');
+var nsqChannel, nsq, nsqOptions;
 nsq = require('nsqjs');
-nsqChannel = 'nodejs';
+nsqChannel = 'nsq-view';
 nsqOptions = {
-  lookupdHTTPAddresses: '127.0.0.1:4161'
+  lookupdHTTPAddresses: (process.env.NSQ_VIEW_LOOKUPDHTTP || '127.0.0.1:4161')
 };
-topic = 'sample';
 
 // declare globals
 nsqReaders = [];
@@ -15,7 +15,12 @@ nsqTopics = [];
 var request = require('request');
 var _ = require('underscore');
 var getTopics = function() {
-  request('http://' + nsqOptions.lookupdHTTPAddresses + '/topics', function(error, response, body) {
+  var requestOptions ={
+    url:'http://' + nsqOptions.lookupdHTTPAddresses + '/topics',
+    timeout: 5 * 1000
+  }
+  request(requestOptions, function(error, response, body) {
+
     if (!error && response.statusCode == 200) {
       var resp = JSON.parse(body);
 
@@ -39,6 +44,9 @@ var getTopics = function() {
         })
       }
       // announce nsqTopics to all socket.io connections
+    } else {
+      console.log('Request %s %s', requestOptions.url, error);
+      io.emit('app:msg', util.format('Request %s %s', requestOptions.url, error));
     }
   });
 }
@@ -55,7 +63,6 @@ var io = require('socket.io')(http);
 app.get('/', function(req, res) {
   res.sendfile('index.html');
 });
-
 
 io.on('connection', function(socket) {
   console.log('socket.client.id: %s connected', socket.client.id)
@@ -152,7 +159,7 @@ io.on('connection', function(socket) {
 });
 
 
-var port = 3000;
+var port = (process.env.NSQ_VIEW_PORT || 3000);
 http.listen(port, function() {
   console.log('listening on *:%s', port);
 });
