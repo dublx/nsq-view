@@ -1,7 +1,7 @@
 nsq-view
 ========
 
-View realtime NSQ messages in any topic from the comfort of your browser.
+View realtime NSQ messages from the comfort of your browser.
 
 
 # About
@@ -10,6 +10,11 @@ NSQ view is a realtime message viewer for NSQ.
 The Server application continuosly pools for NSQ topics and announces new topics to web clients. Web clients can then subscribe/unsubscribe to any topic. 
 
 When the web client subsacribes to a topic, a new channel is created in NSQ and messages are streamed to the web client using websockets. Only one channel per topic is created independent of how many web clients are subscribed to that topic, so your ```nsqd```'s are only getting an aditional connection.
+
+# Use cases
+* Debugging - no need to setup nsq_tail or have to login/access into the NSQ cluster.
+* Unified view - view message contents from many/all NSQ topics in one single place.
+* Extension - add your own logic to make some use of the messages, without having access to the NSQ cluster (eg, the cluster may not accept external connections to the NSQ ports).
 
 # Requirements
 * Nodejs (v0.10.29+)
